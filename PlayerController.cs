@@ -1,16 +1,17 @@
 using UnityEngine;
 
-//[RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : MonoBehaviour
 {
-    //[Header("Movement Settings")]
+    [Header("Movement Settings")]
     public float moveSpeed = 5f;
     public float moveSpeedMultiplier = 1f;
 
-
     public bool canMove = true;
     public bool canDash = true;
-    public float dash_distance = 5f;
+    public float dashDistance = 5f;
+    public float dashDuration = 0.15f; // how long the dash lasts
+    public float dashCooldown = 1f;   // time before next dash
 
     public float acceleration = 10f;
     public float deceleration = 15f;
@@ -25,14 +26,15 @@ public class PlayerController : MonoBehaviour
     private Animator animator;
     private SpriteRenderer spriteRenderer;
 
+    private bool isDashing = false;
+    private float dashCooldownTimer = 0f;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
     }
-
-
 
     void Update()
     {
@@ -50,23 +52,30 @@ public class PlayerController : MonoBehaviour
             bool isMoving = currentVelocity.magnitude > 0.05f;
             animator.SetBool("isMoving", isMoving);
 
-
             bool notMoving = currentVelocity.magnitude == 0.0f;
             animator.SetBool("notMoving", notMoving);
         }
 
-
-
-        // Optional: Turbo trigger
+        // Turbo example
         if (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl))
         {
-            dash();
+            turbo();
         }
-        
+
+        // Dash trigger
+        if (canDash && dashCooldownTimer <= 0 && Input.GetKeyDown(KeyCode.Space))
+        {
+            StartCoroutine(Dash());
+        }
+
+        if (dashCooldownTimer > 0)
+            dashCooldownTimer -= Time.deltaTime;
     }
 
     void FixedUpdate()
     {
+        if (isDashing) return; // skip normal movement while dashing
+
         if (inputDirection.magnitude > 0.1f)
         {
             currentVelocity = Vector2.MoveTowards(currentVelocity, inputDirection * moveSpeed, acceleration * Time.fixedDeltaTime);
@@ -79,10 +88,33 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = currentVelocity;
     }
 
-    public void dash()
+    private System.Collections.IEnumerator Dash()
     {
+        isDashing = true;
+        canDash = false;
+        dashCooldownTimer = dashCooldown;
 
+        Vector2 dashDirection = inputDirection != Vector2.zero ? inputDirection : Vector2.right * (spriteRenderer.flipX ? -1 : 1);
+
+        rb.linearVelocity = dashDirection * (dashDistance / dashDuration);
+
+        yield return new WaitForSeconds(dashDuration);
+
+        isDashing = false;
+        canDash = true;
     }
+
+    private void turbo()
+    {
+        // Example: temporarily boost speed
+        StartCoroutine(TurboBoost());
     }
 
-
+    private System.Collections.IEnumerator TurboBoost()
+    {
+        float originalSpeed = moveSpeed;
+        moveSpeed *= 2f;
+        yield return new WaitForSeconds(1f);
+        moveSpeed = originalSpeed;
+    }
+}
